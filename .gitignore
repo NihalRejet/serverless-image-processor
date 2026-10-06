@@ -50,3 +50,6 @@ build/
 # Environment
 .env
 .env.local
+
+# Lambda layer build output
+layer_build/

@@ -28,7 +28,7 @@ The two buckets are separate on purpose, so the function can never trigger itsel
 
 Every image produces these five files in the processed bucket. The name pattern is `<original-name>_<suffix>_<8-char-id>.<ext>`.
 
-| Suffix | Format | Details | Example size¹ |
+| Suffix | Format | Details | Example size |
 |---|---|---|---|
 | `compressed` | JPEG | quality 85 | 73.6 KB |
 | `low` | JPEG | quality 60 (smaller file) | 52.3 KB |
@@ -36,9 +36,9 @@ Every image produces these five files in the processed bucket. The name pattern 
 | `png` | PNG | optimized | 525.6 KB |
 | `thumbnail` | JPEG | fits inside 300×300, keeps the aspect ratio | 16.8 KB |
 
-¹ From the test run shown in [Results](#results), using one 564×705 JPEG. Your sizes will differ.
+The sizes above come from the test run in [Results](#results), on one 564×705 JPEG. Yours will be different.
 
-Other behavior:
+A few other things the function does:
 
 - Images bigger than 4096 px on either side are scaled down first.
 - Images with transparency (PNG, etc.) are put on a white background, because JPEG has no transparency.
@@ -118,12 +118,6 @@ terraform init
 terraform apply
 ```
 
-To change the region or the names:
-
-```bash
-terraform apply -var="aws_region=ap-south-1" -var="environment=test"
-```
-
 </details>
 
 ### 3. Try it
@@ -155,6 +149,23 @@ cd ..
 
 This empties both buckets (including old versions) and then destroys everything. **It runs `terraform destroy -auto-approve`, so it does not ask first.**
 
+## Settings you can change
+
+Everything is a Terraform variable, so nothing needs editing in `main.tf`:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `aws_region` | `us-east-1` | Region everything is created in |
+| `environment` | `dev` | Goes into the resource names |
+| `project_name` | `image-processor` | Goes into the resource names |
+| `lambda_timeout` | `60` | Lambda timeout in seconds |
+| `lambda_memory_size` | `1024` | Lambda memory in MB |
+
+```bash
+cd terraform
+terraform apply -var="aws_region=ap-south-1" -var="lambda_memory_size=2048"
+```
+
 ## Results
 
 A 564×705 JPEG uploaded to the upload bucket. The Lambda function ran by itself and wrote all five variants to the processed bucket:
@@ -165,11 +176,13 @@ The CloudWatch logs for that single run, from the S3 event to the last upload. T
 
 ![CloudWatch logs for one Lambda invocation](docs/screenshots/cloudwatch-logs.png)
 
-## A problem I solved: Pillow on Lambda
+## The hardest part: getting Pillow to run on Lambda
 
-The first deployment failed. Pillow contains C code, and the copy installed on my laptop was built for a different system than Lambda's Amazon Linux runtime.
+My first deployment kept failing. Pillow is not pure Python, it ships compiled C code, and the copy on my laptop was built for my machine, not for the Amazon Linux that Lambda runs on. So the import died as soon as the function started.
 
-**Fix:** install the Linux x86_64 build of Pillow for Python 3.12 and ship it as a separate **Lambda Layer**. The function code stays tiny (one file), and the library matches the runtime. `scripts/build_layer_docker.sh` now repeats this build in a `python:3.12-slim` Docker container with `--platform linux/amd64`, so it works the same on Windows, macOS and Linux.
+What fixed it was installing the Linux x86_64 build of Pillow for Python 3.12 and shipping it as its own **Lambda Layer**, separate from my code. The function stays one small file, and the library always matches the runtime.
+
+I put that build into `scripts/build_layer_docker.sh`, which runs it inside a `python:3.12-slim` container with `--platform linux/amd64`. That way the layer comes out the same whether I build it on Windows, macOS or Linux, instead of depending on whatever Python I happen to have installed.
 
 ## CI
 

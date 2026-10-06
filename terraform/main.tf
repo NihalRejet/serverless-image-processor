@@ -170,8 +170,8 @@ resource "aws_lambda_function" "image_processor" {
   handler          = "lambda_function.lambda_handler"
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   runtime          = "python3.12"
-  timeout          = 60
-  memory_size      = 1024
+  timeout          = var.lambda_timeout
+  memory_size      = var.lambda_memory_size
 
   layers = [aws_lambda_layer_version.pillow_layer.arn]
 

@@ -27,9 +27,3 @@ variable "lambda_memory_size" {
   type        = number
   default     = 1024
 }
-
-variable "allowed_origins" {
-  description = "Allowed CORS origins"
-  type        = list(string)
-  default     = ["*"]
-}
